@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import spacy
+import json
 import html
 import re
 from io import StringIO
@@ -137,20 +138,40 @@ def clauses_voice(arr_of_clauses):
         op.append(voice)         
     return op
 
+with open('contractions.json', 'r') as f:
+    contraction_map = json.load(f)
 
-def main_voice_classifier(model_type, ip_file):
+def replace_contractions(sent):
+    tokens = sent.split()
+    contractions = contraction_map.keys()
+    op_tokens = []
+    for token in tokens:
+        op_token = token
+        if token.lower() in contractions:
+            op_token = contraction_map[token.lower()]
+            beg, end = op_token[0], op_token[1:]
+            beg = beg.upper() if token[0].isupper() else beg.lower()
+            op_token = beg + end
+        op_tokens.append(op_token)
+    return ' '.join(op_tokens)
+
+def main_voice_classifier(model_type, ip_file, ignore_prompt = True):
     nlp = spacy.load(model_type)
     print("Loaded models")
     df = pd.read_csv(ip_file)
     print(df.columns)
     if "prompt" in df.columns: #Original dataset
         df['sentence'] = df.apply(lambda row : "{} {}".format(row['prompt'], row['response']), axis = 1)
+    df['preprocessed_sentence'] = df['sentence'].apply(replace_contractions)
     PATTERN = "[^a-zA-Z0-9\s]+"
     rgx = re.compile(PATTERN, re.IGNORECASE)
-    df['preprocessed_sentence'] = df['sentence'].apply(lambda ip : re.sub('\s+', ' ', rgx.sub(' ', html.unescape(ip))))
+    df['preprocessed_sentence'] = df['preprocessed_sentence'].apply(lambda ip : re.sub('\s+', ' ', rgx.sub(' ', html.unescape(ip))))
     df['nlp_doc'] = df['preprocessed_sentence'].apply(lambda ip : nlp(ip))
     df['split_by_verbs_arr'] = df['nlp_doc'].apply(clause_split_by_verbs)
-    df['clauses_doc_final'] = df[['prompt', 'split_by_verbs_arr']].apply(lambda x : remove_prompts(x, nlp), axis = 1)
+    if ignore_prompt:
+        df['clauses_doc_final'] = df[['prompt', 'split_by_verbs_arr']].apply(lambda x : remove_prompts(x, nlp), axis = 1)
+    else:
+        df['clauses_doc_final'] = df['split_by_verbs_arr'].copy()
     df["valid_indices_per_doc"] = df['clauses_doc_final'].apply(filter_valid_text_df)
     df['clauses_text_final'] = df.apply(lambda row: get_valid_text_df(row), axis = 1)
     df['split_by_verbs_arr_cleaned'] = df['split_by_verbs_arr'].apply(process_verbs_df)
