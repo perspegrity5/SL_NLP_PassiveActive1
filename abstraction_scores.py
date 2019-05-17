@@ -79,18 +79,24 @@ def hypernym_hierarchy(toks, pos, DEBUG_ABSTRACTION_HIERARCHY = False):
     #print(op)
     return max(op)
 
-def hypernym_score(word, ignore_words, DEBUG_ABSTRACTION_HIERARCHY = False):
+def hypernym_score(word, spacy_pos, ignore_words, DEBUG_ABSTRACTION_HIERARCHY = False):
     toks = wn.synsets(word)
     if len(toks) == 0 or word in ignore_words:
         return 0
 
-    op = hypernym_hierarchy(toks, toks[0].pos(), DEBUG_ABSTRACTION_HIERARCHY = DEBUG_ABSTRACTION_HIERARCHY)
+    nltk_pos = "n"
+    if spacy_pos not in ["NOUN", "PRON", "PROPN"]:
+        return 0
+    op = hypernym_hierarchy(toks, nltk_pos, DEBUG_ABSTRACTION_HIERARCHY = DEBUG_ABSTRACTION_HIERARCHY)
     return round(op, 2)
     
-def score_abstraction(clauses, ignore_words, DEBUG_ABSTRACTION_HIERARCHY = False):
+def score_abstraction(clauses, clauses_doc, ignore_words, DEBUG_ABSTRACTION_HIERARCHY = False):
     op = []
-    for clause in clauses:
-        op.append(max([hypernym_score(x, ignore_words, DEBUG_ABSTRACTION_HIERARCHY = DEBUG_ABSTRACTION_HIERARCHY) for x in clause]))
+    for clause in clauses_doc:
+        check_texts = ' '.join([x.text for x in clause])
+        if check_texts not in clauses:
+            continue
+        op.append(max([hypernym_score(x.text, x.pos_, ignore_words, DEBUG_ABSTRACTION_HIERARCHY = DEBUG_ABSTRACTION_HIERARCHY) for x in clause]))
     return op
 
 # The abstraction score is already betwee 0 and 1. But it is normalized to determine the valid metric value in later notebooks
@@ -104,7 +110,7 @@ def normalize(row, x_max, x_min, reverse_arr = False):
 def main_abstraction_scorer(df, DEBUG_ABSTRACTION_HIERARCHY = False):
     ignore_words = list(set(stopwords.words('english')))
     ignore_words = ignore_words + ['keep']
-    df['abstraction_score'] = df.clauses_text_final.apply(lambda x : score_abstraction(x, ignore_words, DEBUG_ABSTRACTION_HIERARCHY = DEBUG_ABSTRACTION_HIERARCHY))
+    df['abstraction_score'] = df.apply(lambda row: score_abstraction(row['clauses_text_final'], row['clauses_doc_final'], ignore_words, DEBUG_ABSTRACTION_HIERARCHY = DEBUG_ABSTRACTION_HIERARCHY), axis=1)
     abstraction_score = df['abstraction_score'].tolist()
     abstraction_score = [j for i in abstraction_score for j in i]
     x_max, x_min = max(abstraction_score), min(abstraction_score)

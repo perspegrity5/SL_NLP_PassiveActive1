@@ -160,5 +160,5 @@ def main_voice_classifier(model_type, ip_file):
     df["voice_filtered"] = df.apply(lambda row: [row["voice"][i] for i in range(len(row["voice"])) if i in row["valid_indices_per_doc"]], axis = 1)
     df["voice"] = df["voice_filtered"]
     print("Is this 0?", df[df["clauses_text_final"].apply(len) != df["voice"].apply(len)].shape[0])
-    df_out = df[['UID', 'survey_id', 'prompt_number', 'prompt_id', 'prompt', 'response', 'clauses_text_final', 'voice', 'score','PassAct']]
+    df_out = df[['UID', 'survey_id', 'prompt_number', 'prompt_id', 'prompt', 'response', 'clauses_text_final', 'clauses_doc_final', 'voice', 'score','PassAct']]
     return df_out
