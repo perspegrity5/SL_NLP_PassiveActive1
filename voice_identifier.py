@@ -16,7 +16,7 @@ def main():
     parser.add_argument('ip_file', type=str,help='Input CSV file\'s relative or absolute location')
     parser.add_argument('result_file', type=str,help='Output CSV file\'s relative or absolute location')
     parser.add_argument('debug_file', type=str,help='Debug CSV file\'s relative or absolute location')
-    parser.add_argument('model_type', type=str, choices=['en_core_web_sm', 'en_core_web_md', 'en_core_web_lg'])
+    parser.add_argument('model_type', type=str, help='Spacy model type you have downloaded in your machine', choices=['en_core_web_sm', 'en_core_web_md', 'en_core_web_lg'])
     parser.add_argument('--debug_abstraction_hierarchy', type=bool, default = False)
     parser.add_argument('--weighted_metrics', type=bool, default = True)
     parser.add_argument('--ignore_prompt', dest='ignore_prompt', action='store_true')
