@@ -5,6 +5,7 @@ import spacy
 import json
 import html
 import re
+import os
 from io import StringIO
 import pandas as pd, numpy as np
 
@@ -155,13 +156,32 @@ def replace_contractions(sent):
         op_tokens.append(op_token)
     return ' '.join(op_tokens)
 
-def main_voice_classifier(model_type, ip_file, ignore_prompt = True):
+def htmlise(row, file_dir):
+    html_fs = """
+    <html>
+        <head>
+            <title>{}</title>
+        </head>
+        <body>
+            <div>{}</div>
+            <div>{}</div>
+            <div>{}</div>
+        </body>
+    </html>"""
+    op = spacy.displacy.render(row.nlp_doc, style='dep')
+    file_loc = os.path.join(file_dir, "file_{}.html".format(row.UID))
+    with open(file_loc, "w") as f:
+        f.write(html_fs.format(row.prompt, row.response, row.clauses_text_final, op))
+    return file_loc
+
+def main_voice_classifier(model_type, ip_file, ignore_prompt=True, save_html=True, file_dir=None):
     nlp = spacy.load(model_type)
     print("Loaded models")
     df = pd.read_csv(ip_file)
     print(df.columns)
     if "prompt" in df.columns: #Original dataset
         df['sentence'] = df.apply(lambda row : "{} {}".format(row['prompt'], row['response']), axis = 1)
+        
     df['preprocessed_sentence'] = df['sentence'].apply(replace_contractions)
     PATTERN = "[^a-zA-Z0-9\s]+"
     rgx = re.compile(PATTERN, re.IGNORECASE)
@@ -172,8 +192,12 @@ def main_voice_classifier(model_type, ip_file, ignore_prompt = True):
         df['clauses_doc_final'] = df[['prompt', 'split_by_verbs_arr']].apply(lambda x : remove_prompts(x, nlp), axis = 1)
     else:
         df['clauses_doc_final'] = df['split_by_verbs_arr'].copy()
+        
     df["valid_indices_per_doc"] = df['clauses_doc_final'].apply(filter_valid_text_df)
     df['clauses_text_final'] = df.apply(lambda row: get_valid_text_df(row), axis = 1)
+    if save_html:
+        df['file_loc'] = df.apply(lambda row: htmlise(row, file_dir), axis=1)
+    
     df['split_by_verbs_arr_cleaned'] = df['split_by_verbs_arr'].apply(process_verbs_df)
     #We will solve the inconsistency in voice length  using valid_indices
     df[df["clauses_text_final"].apply(len) != df["clauses_doc_final"].apply(len)]
@@ -181,5 +205,8 @@ def main_voice_classifier(model_type, ip_file, ignore_prompt = True):
     df["voice_filtered"] = df.apply(lambda row: [row["voice"][i] for i in range(len(row["voice"])) if i in row["valid_indices_per_doc"]], axis = 1)
     df["voice"] = df["voice_filtered"]
     print("Is this 0?", df[df["clauses_text_final"].apply(len) != df["voice"].apply(len)].shape[0])
-    df_out = df[['UID', 'survey_id', 'prompt_number', 'prompt_id', 'prompt', 'response', 'clauses_text_final', 'clauses_doc_final', 'voice', 'score','PassAct']]
+    op_cols = ['UID', 'survey_id', 'prompt_number', 'prompt_id', 'prompt', 'response', 'clauses_text_final', 'clauses_doc_final', 'voice', 'score','PassAct']
+    if save_html:
+        op_cols = op_cols + ['file_loc']
+    df_out = df[op_cols]
     return df_out
