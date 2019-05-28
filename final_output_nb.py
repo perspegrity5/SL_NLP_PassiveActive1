@@ -47,7 +47,7 @@ def main_final_output_scorer(df, result_file, debug_file, WEIGHT_METRICS = True)
         dfdel[x + "_length"] = dfdel[x].apply(len)
     dfdel = dfdel[[x for x in dfdel.columns if x.endswith("length")]]
     dfdel["flag"] = dfdel.eq(dfdel.iloc[:, 0], axis=0).all(1)
-    print("Is this 0?", dfdel[dfdel["flag"] == False]) #Works like a charm if this df is empty
+    print("Is this an empty dataframe?", dfdel[dfdel["flag"] == False]) #Works like a charm if this df is empty
     
     arrcols = ["clauses_text_final", "voice", "abstraction_score_normalized", "reading_ease_normalized", "grading_level_normalized", "sgrank_normalized"]
     non_arrcols = list(set(df2.columns) - set(arrcols))

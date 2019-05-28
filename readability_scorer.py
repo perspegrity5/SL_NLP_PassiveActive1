@@ -3,12 +3,11 @@
 
 import textacy
 import pandas as pd
-from textacy.text_stats import TextStats
 from textacy.keyterms import sgrank
 
-def score_readability(text, model_type = 'en_core_web_lg'):
-    doc = textacy.Doc(text, lang = model_type)
-    ts = TextStats(doc)
+def score_readability(text, model_type):
+    doc = textacy.make_spacy_doc(text, lang=model_type)
+    ts = textacy.TextStats(doc)
     return ts.readability_stats
 
 def normalize(row, x_max, x_min, reverse_arr = False):
@@ -33,7 +32,8 @@ def get_normalized_importance(df):
     return op
 
 def main_readability_scorer(df, model_type):
-    df['readability_attributes_score'] = df.clauses_text_final.apply(lambda arr: [score_readability(x, model_type = model_type) for x in arr])
+    en = textacy.load_spacy_lang(model_type)
+    df['readability_attributes_score'] = df.clauses_text_final.apply(lambda arr: [score_readability(x, model_type=en) for x in arr])
     df['grading_level'] = df.readability_attributes_score.apply(lambda dct_arr: [round(dct['flesch_kincaid_grade_level'], 2) for dct in dct_arr])
     df['reading_ease'] = df.readability_attributes_score.apply(lambda dct_arr: [round(dct['flesch_reading_ease'], 2) for dct in dct_arr])
     _ = """[{'flesch_kincaid_grade_level': 0.6257142857142846, 'flesch_reading_ease': 103.04428571428573, 'smog_index': 3.1291, 'gunning_fog_index': 2.8000000000000003, 'coleman_liau_index': 2.6518669999999993, 'automated_readability_index': 0.23714285714285666, 'lix': 7.0, 'gulpease_index': 93.28571428571428, 'wiener_sachtextformel': -2.5074571428571426}]"""
@@ -53,7 +53,7 @@ def main_readability_scorer(df, model_type):
     grade = df['grading_level_normalized'].tolist()
     grade = [j for i in grade for j in i]
     print(max(reading_ease), min(reading_ease), max(grade), min(grade))
-    df['nlp_doc'] = df.apply(lambda row : textacy.Doc(row['prompt'] + " " + row['response'], lang = model_type), axis = 1) # . tjm changed lang = 'en'
-    df['sgrank'] = df['nlp_doc'].apply(lambda doc : sgrank(doc, n_keyterms = len(doc)))
+    df['textacy_doc'] = df.apply(lambda row : textacy.make_spacy_doc(row['prompt'] + " " + row['response'], lang=en), axis = 1)
+    df['sgrank'] = df['textacy_doc'].apply(lambda doc : sgrank(doc, n_keyterms = len(doc)))
     df["sgrank_normalized"] = df.apply(get_normalized_importance, axis = 1)
     return df
