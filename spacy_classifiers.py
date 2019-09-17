@@ -9,6 +9,11 @@ import os
 from io import StringIO
 import pandas as pd, numpy as np
 
+with open('config.json', 'r') as f:
+    config_json = json.load(f)
+    contraction_map = config_json['contractions']
+    verb_ing_tokens = config_json['verb_ing_tokens']
+
 def flatten_list(l):
     flat_list = [item for sublist in l for item in sublist]
     return flat_list
@@ -104,14 +109,21 @@ def process_verbs_df(clauses_arr):
     
     return new_arr
         
-a_poss, p_yn, p_beverb, p_get, a_def, undef = "A_pron_x", "P_yn", "P_bevb_x", "P_get_x", "A_def", "Undefined"
+p_stem, a_poss, p_yn, p_verb_ing, a_verb_ing, p_beverb, p_get, a_def, undef = "P_stem", "A_pron_x", "P_yn", "P_ing", "A_ing", "P_bevb_x", "P_get_x", "A_def", "Undefined"
 
-def voice_rule_engine(clause):
+def voice_rule_engine(clause, prompt):
+    PROMPT_VERBS = ['is', 'am', 'are', 'get', 'feel']
+    BEING_VERBS = ['be', 'am', 'is', 'isn', 'are', 'aren', 'was', 'were', 'wasn', 'weren', 'been', 'being', 'have', 'haven', 'has', 'hasn', 'could', 'couldn', 'should', 'shouldn', 'would', 'wouldn', 'may', 'might', 'mightn', 'must','mustn', 'shall', 'can', 'will',  'do', 'don', 'did', 'didn', 'does', 'doesn', 'having']
+    
+    if PROMPT_VERBS in [x.text.lower() for x in clause]:
+        return p_stem
+
     if True not in [x.pos_ == "VERB" for x in clause]:
         return undef
     
-    for x in clause:
-        if x.dep_ == "poss":
+    for i in range(1, len(clause)):
+        x, xprev = clause[i], clause[i-1]
+        if x.dep_ == "poss" and xprev.text.lower() in BEING_VERBS:
             return a_poss
         
     ct = 0
@@ -121,7 +133,13 @@ def voice_rule_engine(clause):
     if ct >= len(clause)/2:
         return p_yn
 
-    BEING_VERBS = ['be', 'am', 'is', 'isn', 'are', 'aren', 'was', 'were', 'wasn', 'weren', 'been', 'being', 'have', 'haven', 'has', 'hasn', 'could', 'couldn', 'should', 'shouldn', 'would', 'wouldn', 'may', 'might', 'mightn', 'must','mustn', 'shall', 'can', 'will',  'do', 'don', 'did', 'didn', 'does', 'doesn', 'having']
+    for i in range(len(clause)-1):
+        x, xnext = clause[i], clause[i+1]
+        if x.text.lower().strip() in BEING_VERBS and x.pos_ == "VERB":
+            if xnext.text.lower() in verb_ing_tokens:
+                return p_verb_ing
+            return a_verb_ing
+
     for x in clause:
         if x.text.lower().strip() in BEING_VERBS and x.pos_ == "VERB":
             return p_beverb
@@ -132,15 +150,13 @@ def voice_rule_engine(clause):
     
     return a_def
     
-def clauses_voice(arr_of_clauses):
+def clauses_voice(row):
+    arr_of_clauses, prompt = row['clauses_doc_final'], row['prompt']
     op = []
     for clause in arr_of_clauses:
-        voice = voice_rule_engine(clause)
+        voice = voice_rule_engine(clause, prompt)
         op.append(voice)         
     return op
-
-with open('contractions.json', 'r') as f:
-    contraction_map = json.load(f)
 
 def replace_contractions(sent):
     tokens = sent.split()
@@ -201,7 +217,7 @@ def main_voice_classifier(model_type, ip_file, ignore_prompt=True, save_html=Tru
     df['split_by_verbs_arr_cleaned'] = df['split_by_verbs_arr'].apply(process_verbs_df)
     #We will solve the inconsistency in voice length  using valid_indices
     df[df["clauses_text_final"].apply(len) != df["clauses_doc_final"].apply(len)]
-    df['voice'] = df.clauses_doc_final.apply(clauses_voice)
+    df['voice'] = df[['clauses_doc_final', 'prompt']].apply(clauses_voice, axis=1)
     df["voice_filtered"] = df.apply(lambda row: [row["voice"][i] for i in range(len(row["voice"])) if i in row["valid_indices_per_doc"]], axis = 1)
     df["voice"] = df["voice_filtered"]
     print("Is this 0?", df[df["clauses_text_final"].apply(len) != df["voice"].apply(len)].shape[0])
