@@ -109,13 +109,13 @@ def process_verbs_df(clauses_arr):
     
     return new_arr
         
-p_stem, a_poss, p_yn, p_verb_ing, a_verb_ing, p_beverb, p_get, a_def, undef = "P_stem", "A_pron_x", "P_yn", "P_ing", "A_ing", "P_bevb_x", "P_get_x", "A_def", "Undefined"
+p_stem, a_poss, p_yn, p_verb_ing, a_verb_ing, p_beverb, p_get, a_def, undef = "P_stem", "A_pron_x", "P_yn", "P_very_ing", "A_ing", "P_bevb_x", "P_get_x", "A_def", "U_undefined"
 
 def voice_rule_engine(clause, prompt):
     PROMPT_VERBS = ['is', 'am', 'are', 'get', 'feel']
     BEING_VERBS = ['be', 'am', 'is', 'isn', 'are', 'aren', 'was', 'were', 'wasn', 'weren', 'been', 'being', 'have', 'haven', 'has', 'hasn', 'could', 'couldn', 'should', 'shouldn', 'would', 'wouldn', 'may', 'might', 'mightn', 'must','mustn', 'shall', 'can', 'will',  'do', 'don', 'did', 'didn', 'does', 'doesn', 'having']
     
-    if PROMPT_VERBS in [x.text.lower() for x in clause]:
+    if len(list(set(PROMPT_VERBS).intersection(set([x.text.lower() for x in clause])))) > 0:
         return p_stem
 
     if True not in [x.pos_ == "VERB" for x in clause]:
